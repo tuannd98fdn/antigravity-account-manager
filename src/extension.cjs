@@ -267,11 +267,72 @@ function activate(context) {
     finally { busy = false; renewing = false; await render(); }
   }
   const renewalTimer = setInterval(() => { void renewDue().catch(() => {}); }, 30000);
+
+  // Real-time In-Chat Quota Exhaustion Watcher
+  // Detects in-band 429 RESOURCE_EXHAUSTED errors directly from Antigravity language server / chat stream
+  let lastLogSize = 0;
+  const os = require('node:os');
+  const chatLogPath = path.join(os.homedir(), '.gemini/antigravity/cli.log');
+  try {
+    if (fs.existsSync(chatLogPath)) lastLogSize = fs.statSync(chatLogPath).size;
+  } catch {}
+
+  async function checkChatLogForQuotaErrors() {
+    if (busy || monitorConfig.autoSwitch === false) return;
+    try {
+      if (!fs.existsSync(chatLogPath)) return;
+      const stat = fs.statSync(chatLogPath);
+      if (stat.size <= lastLogSize) {
+        if (stat.size < lastLogSize) lastLogSize = 0; // rotated
+        return;
+      }
+      const readLen = Math.min(stat.size - lastLogSize, 64 * 1024);
+      const fd = fs.openSync(chatLogPath, 'r');
+      const buf = Buffer.alloc(readLen);
+      fs.readSync(fd, buf, 0, readLen, stat.size - readLen);
+      fs.closeSync(fd);
+      lastLogSize = stat.size;
+      const text = buf.toString('utf8');
+
+      if (/RESOURCE_EXHAUSTED|QUOTA_EXHAUSTED|Individual quota reached/i.test(text)) {
+        const modelMatch = text.match(/"model":\s*"([^"]+)"/) || text.match(/model=([a-z0-9_-]+)/i);
+        const exhaustedModelId = modelMatch ? modelMatch[1] : (monitorConfig.modelId || 'gemini-4-argon-medium');
+
+        const active = await activeAccount();
+        if (!active) return;
+
+        // Mark model as exhausted on active account
+        for (const m of (active.models || [])) {
+          if (m.id === exhaustedModelId || (exhaustedModelId.includes('argon') && /argon/i.test(m.id))) {
+            m.fraction = 0;
+            m.status = 'exhausted';
+          }
+        }
+        await save();
+        void render();
+
+        // Find candidate account with quota
+        const alternatives = accounts.filter(a => a.id !== active.id && !a.error);
+        const candidate = alternatives.find(a => (a.models || []).some(m =>
+          (m.id === exhaustedModelId || (exhaustedModelId.includes('argon') && /argon/i.test(m.id))) &&
+          (m.fraction > 0 || m.fraction === null)
+        )) || alternatives[0];
+
+        if (candidate) {
+          vscode.window.showInformationMessage(`[Autonomous Quota Hop] In-chat quota exhausted on ${active.email}. Auto-switching to ${candidate.email}…`);
+          await switchAccount(candidate, true);
+        }
+      }
+    } catch {}
+  }
+
+  const chatWatcherTimer = setInterval(() => { void checkChatLogForQuotaErrors().catch(() => {}); }, 2500);
+
   context.subscriptions.push(vscode.window.onDidChangeWindowState(state => {
     if (!state.focused) finishOffer('cancelled');
     else void ready.then(() => monitor.tick()).catch(() => {});
   }));
-  context.subscriptions.push({ dispose: () => { monitorConfig = { ...monitorConfig, enabled: false }; finishOffer('cancelled'); monitor.releaseLease(); clearInterval(monitorTimer); clearInterval(renewalTimer); } });
+  context.subscriptions.push({ dispose: () => { monitorConfig = { ...monitorConfig, enabled: false }; finishOffer('cancelled'); monitor.releaseLease(); clearInterval(monitorTimer); clearInterval(renewalTimer); clearInterval(chatWatcherTimer); } });
   context.subscriptions.push(vscode.commands.registerCommand('agm.open', () => vscode.commands.executeCommand('agm.accounts.focus')));
   context.subscriptions.push(vscode.commands.registerCommand('agm.refresh', () => action({ type: 'refresh' })));
   context.subscriptions.push(vscode.commands.registerCommand('agm.connect', () => action({ type: 'login' })));
