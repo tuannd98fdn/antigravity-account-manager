@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{csp}}; style-src {{csp}} 'unsafe-inline'; script-src 'nonce-{{nonce}}';">
+  <link rel="stylesheet" href="{{css}}">
+  <title>Antigravity Fleet Manager</title>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand-bar">
+      <div class="brand-title">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div class="brand-meta">
+          <h2>ANTIGRAVITY FLEET <span class="version-tag">PRO</span></h2>
+          <span class="author-tag">by Tuan Nguyen Dinh</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <span id="activity" class="status-pulse-pill"><span class="pulse-dot"></span> On demand</span>
+        <button id="github-link" class="icon-link-btn" title="View Source on GitHub">
+          <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-title">ACCOUNTS</span>
+        <span id="count" class="stat-value">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-title">READY QUOTA</span>
+        <span id="stat-ready" class="stat-value text-accent">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-title">AUTO-PILOT</span>
+        <span id="stat-autopilot" class="stat-value text-amber">OFF</span>
+      </div>
+    </div>
+
+    <!-- Connect Toolbar -->
+    <div class="actions-row">
+      <button id="login" class="btn-primary">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        Connect Google
+      </button>
+      <button id="import" class="btn-secondary" title="Save current IDE active account">Use IDE Session</button>
+      <button id="chromeImport" class="btn-secondary" title="Import Google accounts from Chrome profiles">Chrome Import</button>
+    </div>
+
+    <!-- Auto-Pilot Control Center -->
+    <div class="autopilot-card">
+      <div class="card-header">
+        <div class="card-icon">⚡</div>
+        <div class="card-title-group">
+          <strong>Autonomous Quota Hop</strong>
+          <span class="card-subtitle">Zero-click account switching & task resume</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label for="selected-model" class="field-label">Monitored Target Model</label>
+        <div class="select-wrapper">
+          <select id="selected-model">
+            <option value="">Select model to monitor…</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="model-result" class="model-result-box" hidden aria-live="polite"></div>
+
+      <div class="toggle-list">
+        <label class="switch-item">
+          <input id="monitor-enabled" type="checkbox">
+          <span class="switch-label">Enable Quota Monitoring</span>
+        </label>
+        <label class="switch-item">
+          <input id="auto-switch-enabled" type="checkbox" checked>
+          <span class="switch-label"><strong>Zero-Click Auto Switch</strong> (No confirmation popup)</span>
+        </label>
+        <label class="switch-item">
+          <input id="auto-resume-enabled" type="checkbox" checked>
+          <span class="switch-label"><strong>Auto-Resume Task</strong> (Inject prompt to continue coding)</span>
+        </label>
+      </div>
+
+      <div class="status-ticker">
+        <span class="ticker-dot"></span>
+        <span id="monitor-status" role="status">Select a model to activate Auto-Pilot.</span>
+      </div>
+    </div>
+
+    <!-- Switch Offer Card (Fall-back for manual confirmation) -->
+    <section id="switch-offer" class="offer-alert" hidden aria-live="polite">
+      <div class="offer-head">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <strong>Quota Depleted</strong>
+      </div>
+      <p id="offer-text" class="offer-desc"></p>
+      <div class="offer-actions">
+        <button id="offer-switch" class="btn-primary-sm">Switch Account</button>
+        <button id="offer-later" class="btn-ghost-sm">Snooze (10m)</button>
+        <button id="offer-stop" class="btn-ghost-sm">Disable</button>
+      </div>
+    </section>
+
+    <!-- Filters & Refresh -->
+    <div class="search-filter-bar">
+      <div class="search-box">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 4 4"/></svg>
+        <input id="model" aria-label="Filter accounts or models" type="search" placeholder="Search account or model…" autocomplete="off">
+      </div>
+      <div class="filter-actions">
+        <label class="filter-chip">
+          <input id="available" type="checkbox">
+          <span>Available</span>
+        </label>
+        <button id="refresh" class="btn-refresh" title="Refresh Quotas">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v5h5M15 12v-5h-5"/><path d="M2.5 9a6 6 0 0 1 9.5-4.5L15 7M1 9l3 2.5A6 6 0 0 0 13.5 7"/></svg>
+          Sync All
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-body">
+    <div id="notice" class="notice-banner" role="status" aria-live="polite" hidden></div>
+    <section id="accounts" class="accounts-flow" aria-label="Connected accounts"></section>
+
+    <section id="empty" class="empty-state">
+      <div class="empty-icon-ring">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="8" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/>
+        </svg>
+      </div>
+      <h3>No Accounts Connected</h3>
+      <p>Connect your Google accounts to unlock seamless multi-account quota rotation.</p>
+      <button onclick="document.getElementById('import').click()" class="btn-primary">Use Current IDE Account</button>
+    </section>
+
+    <p id="no-results" class="empty-state-compact" hidden>No accounts or models match your criteria.</p>
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-status">
+      <span><span class="safe-badge">✓</span> Encrypted in OS Keychain</span>
+      <button id="github-footer" class="github-link-text">
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        GitHub
+      </button>
+    </div>
+    <details class="session-drawer">
+      <summary><span>Session Rollback</span></summary>
+      <div class="drawer-content">
+        <p>Restore the previous IDE Google session and restart services.</p>
+        <button id="restore" class="btn-ghost-sm">Undo Last Switch</button>
+      </div>
+    </details>
+  </footer>
+
+  <script nonce="{{nonce}}" src="{{readiness}}"></script>
+  <script nonce="{{nonce}}" src="{{js}}"></script>
+</body>
+</html>
