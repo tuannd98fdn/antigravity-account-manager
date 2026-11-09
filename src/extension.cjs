@@ -28,6 +28,11 @@ function activate(context) {
     if (saved) accounts = JSON.parse(saved);
     config = core.installedConfig(vscode.env.appRoot);
     if (typeof vscode.getCloudCodeUrl === 'function') config.cloudCodeUrl = await vscode.getCloudCodeUrl();
+    for (const a of accounts) {
+      if (a.models && a.tier) core.ensureProModels(a.models, a.tier);
+    }
+    void render();
+    if (accounts.length > 0) void checkMany(accounts, false);
   })();
   ready.catch(() => {});
   const save = () => context.secrets.store(ACCOUNT_KEY, JSON.stringify(accounts));
@@ -53,18 +58,20 @@ function activate(context) {
       accounts: accounts.map(a => ({ id: a.id, email: a.email, name: a.name, tier: a.tier, checkedAt: a.checkedAt,
         error: a.error, models: (a.models || []).map(m => ({ ...m, status: core.availability(m) })) })) });
   }
-  async function check(a, persist = true) {
+  async function check(a, persist = true, forceFresh = false) {
     a.lastQuotaAttemptAt = new Date().toISOString();
     try {
+      if (forceFresh && a.quotaCache) a.quotaCache.updatedAt = 0;
       a.token = await core.refreshToken(a.token, config);
       const result = await core.quotas(a.token, config, a.quotaCache ||= {});
       Object.assign(a, result, { checkedAt: new Date().toISOString(), error: null });
+      if (a.models && a.tier) core.ensureProModels(a.models, a.tier);
     } catch (error) { a.error = error.message; }
     if (persist) await save();
   }
-  async function checkMany(list, showProgress = true) {
+  async function checkMany(list, showProgress = true, forceFresh = false) {
     try {
-      await scanAccounts(list, a => check(a, false), { onProgress: (done, total) => {
+      await scanAccounts(list, a => check(a, false, forceFresh), { onProgress: (done, total) => {
         if (showProgress) { notice = `Checked ${done}/${total} accounts`; void render(); }
       } });
     } finally { await save(); }
@@ -196,7 +203,7 @@ function activate(context) {
           break;
         }
         case 'refresh':
-          await checkMany(account ? [account] : accounts);
+          await checkMany(account ? [account] : accounts, true, true);
           notice = 'Quota check finished.'; break;
         case 'switch': if (account) await switchAccount(account); break;
         case 'restore': {

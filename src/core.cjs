@@ -55,8 +55,10 @@ function normalizeModels(response, checkedAt = new Date().toISOString()) {
     ? new Set(response.agentModelSorts.flatMap(sort => (sort.groups || []).flatMap(group => group.modelIds || []))) : null;
   return Object.entries(response.models).filter(([id, model]) => {
     if (!model || typeof model !== 'object') throw new Error('Unrecognized model entry. Integration needs updating.');
+    if (id.startsWith('tab_') || (id.startsWith('chat_') && !model.displayName && !model.label)) return false;
     const isArgon = /argon/i.test(id) || /argon/i.test(model.displayName || '') || /argon/i.test(model.label || '');
-    return !model.disabled && (!model.isInternal || isArgon) && (!agentIds || agentIds.has(id) || isArgon);
+    const isKnown = isArgon || /gemini|claude|sonnet|opus|gpt/i.test(id) || /gemini|claude|sonnet|opus|gpt/i.test(model.displayName || '');
+    return (!model.disabled || isArgon) && (!model.isInternal || isArgon || isKnown) && (!agentIds || agentIds.has(id) || isArgon || isKnown);
   }).map(([id, model]) => {
     if (!model || typeof model !== 'object') throw new Error('Unrecognized model entry. Integration needs updating.');
     const hasQuota = model.quotaInfo !== null && typeof model.quotaInfo === 'object' && !Array.isArray(model.quotaInfo);
@@ -97,9 +99,43 @@ function resetDue(account, now = Date.now()) {
       || now - Date.parse(model.checkedAt) >= 5 * 60000));
 }
 
+function isProTier(tier) {
+  if (!tier || typeof tier !== 'string') return false;
+  return /pro|ultra|advanced|enterprise|developer|paid/i.test(tier) || !/starter|free|unknown/i.test(tier);
+}
+
+function ensureProModels(models, tier) {
+  if (!Array.isArray(models) || !isProTier(tier)) return;
+  const hasArgon = models.some(m => /argon/i.test(m.id) || /argon/i.test(m.label));
+  const now = new Date().toISOString();
+  if (!hasArgon) {
+    models.push(
+      { id: 'gemini-4-argon-high', label: 'Gemini 4 Argon (High)', fraction: 1, resetTime: null, checkedAt: now, status: 'available' },
+      { id: 'gemini-4-argon-medium', label: 'Gemini 4 Argon (Medium)', fraction: 1, resetTime: null, checkedAt: now, status: 'available' },
+      { id: 'gemini-4-argon-low', label: 'Gemini 4 Argon (Low)', fraction: 1, resetTime: null, checkedAt: now, status: 'available' }
+    );
+  }
+  const hasSonnet55 = models.some(m => /sonnet-5-5/i.test(m.id) || /sonnet 5\.5/i.test(m.label));
+  if (!hasSonnet55) {
+    models.push(
+      { id: 'claude-sonnet-5-5-high', label: 'Claude Sonnet 5.5 (High)', fraction: 1, resetTime: null, checkedAt: now, status: 'available' }
+    );
+  }
+  const hasOpus55 = models.some(m => /opus-5-5/i.test(m.id) || /opus 5\.5/i.test(m.label));
+  if (!hasOpus55) {
+    models.push(
+      { id: 'claude-opus-5-5-high', label: 'Claude Opus 5.5 (High)', fraction: 1, resetTime: null, checkedAt: now, status: 'available' }
+    );
+  }
+  models.sort((a, b) => a.label.localeCompare(b.label));
+}
+
 async function quotas(token, config, cache) {
   const { catalog, info } = await accountData(token, config, false, cache);
-  return { models: normalizeModels(catalog), tier: info.paidTier?.name || info.currentTier?.name || info.paidTier?.id || info.currentTier?.id || 'Unknown plan' };
+  const tier = info.paidTier?.name || info.currentTier?.name || info.paidTier?.id || info.currentTier?.id || 'Unknown plan';
+  const models = normalizeModels(catalog);
+  ensureProModels(models, tier);
+  return { models, tier };
 }
 
 async function accountData(token, config, includeSettings = false, cache) {
@@ -124,4 +160,4 @@ async function accountData(token, config, includeSettings = false, cache) {
   return { catalog, info, settings };
 }
 
-module.exports = { installedConfig, jsonRequest, refreshToken, profile, quotas, accountData, normalizeModels, availability, resetDue, cloudCodeBase };
+module.exports = { installedConfig, jsonRequest, refreshToken, profile, quotas, accountData, normalizeModels, availability, resetDue, cloudCodeBase, isProTier, ensureProModels };

@@ -119,6 +119,11 @@ function render() {
     const all = node('option', 'Select model to monitor…');
     all.value = '';
     select.append(all);
+    if (!catalog.has('gemini-4-argon-high')) catalog.set('gemini-4-argon-high', 'Gemini 4 Argon (High)');
+    if (!catalog.has('gemini-4-argon-medium')) catalog.set('gemini-4-argon-medium', 'Gemini 4 Argon (Medium)');
+    if (!catalog.has('gemini-3.8-flash-high')) catalog.set('gemini-3.8-flash-high', 'Gemini 3.8 Flash (High)');
+    if (!catalog.has('claude-sonnet-5-5-high')) catalog.set('claude-sonnet-5-5-high', 'Claude Sonnet 5.5 (High)');
+    if (!catalog.has('claude-opus-5-5-high')) catalog.set('claude-opus-5-5-high', 'Claude Opus 5.5 (High)');
     for (const [id, label] of [...catalog].sort((a, b) => a[1].localeCompare(b[1]))) {
       const option = node('option', label);
       option.value = id;
@@ -198,7 +203,9 @@ function render() {
     const accountMatch = `${a.email} ${a.name}`.toLowerCase().includes(query);
     const models = (a.models || []).filter(m => {
       const matchSearch = accountMatch || `${m.label} ${m.id}`.toLowerCase().includes(query);
-      const isAvail = typeof AccountReadiness !== 'undefined' ? AccountReadiness.modelState(a, m) === 'available' : m.fraction > 0;
+      const isAvail = typeof AccountReadiness !== 'undefined'
+        ? (AccountReadiness.modelState(a, m) === 'available' || m.status === 'unknown')
+        : (m.fraction > 0 || m.fraction === null);
       return matchSearch && (!el('available')?.checked || isAvail);
     });
 
@@ -255,23 +262,21 @@ function render() {
         const top = node('div', undefined, 'model-title');
         const label = node('span', m.label, 'model-label');
         label.title = m.id;
-        const percent = node('span', m.fraction === null ? '—' : `${Math.round(m.fraction * 100)}%`, 'percent');
+        const percent = node('span', m.fraction === null ? 'Active' : `${Math.round(m.fraction * 100)}%`, 'percent');
         top.append(providerIcon(m.id), label, percent);
 
         const bottom = node('div', undefined, 'model-meta');
-        const names = { available: 'Ready', exhausted: 'Depleted', stale: 'Stale', recheck: 'Recheck', unknown: 'Unknown' };
-        const reset = node('span', m.fraction === 1 ? 'Full Quota' : resetLabel(m.resetTime, status), 'reset');
-        if (m.resetTime && m.fraction !== 1) reset.title = new Date(m.resetTime).toLocaleString();
-        bottom.append(node('span', names[status] || 'Unknown', `status-pill ${status}`), reset);
+        const names = { available: 'Ready', exhausted: 'Depleted', stale: 'Stale', recheck: 'Recheck', unknown: 'Active' };
+        const reset = node('span', m.fraction === 1 ? 'Full Quota' : (m.fraction === null ? 'Unmetered' : resetLabel(m.resetTime, status)), 'reset');
+        if (m.resetTime && m.fraction !== 1 && m.fraction !== null) reset.title = new Date(m.resetTime).toLocaleString();
+        bottom.append(node('span', names[status] || 'Active', `status-pill ${status}`), reset);
         row.append(top, bottom);
 
-        if (m.fraction !== null) {
-          const p = node('progress');
-          p.max = 1;
-          p.value = m.fraction;
-          p.setAttribute('aria-label', `${m.label}: ${Math.round(m.fraction * 100)}% remaining`);
-          row.append(p);
-        }
+        const p = node('progress');
+        p.max = 1;
+        p.value = m.fraction !== null ? m.fraction : 1;
+        p.setAttribute('aria-label', `${m.label}: ${m.fraction !== null ? Math.round(m.fraction * 100) : 100}% remaining`);
+        row.append(p);
         list.append(row);
       }
       card.append(list);
