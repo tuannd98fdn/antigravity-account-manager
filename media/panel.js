@@ -92,7 +92,7 @@ function resetLabel(time, status) {
 }
 
 function providerIcon(id) {
-  const provider = /claude/i.test(id) ? 'claude' : /gemini|google/i.test(id) ? 'google' : /gpt|openai/i.test(id) ? 'openai' : 'model';
+  const provider = /claude/i.test(id) ? 'claude' : /gemini|google|argon/i.test(id) ? 'google' : /gpt|openai/i.test(id) ? 'openai' : 'model';
   const circle = node('span', undefined, `provider-icon ${provider}`);
   const img = node('img');
   img.src = new URL(`${provider}.svg`, document.querySelector('script[src]').src).toString();

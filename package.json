@@ -2,7 +2,7 @@
   "name": "antigravity-account-manager",
   "displayName": "Antigravity Fleet Pro - Autonomous Multi-Account Manager",
   "description": "Autonomous multi-account quota monitoring, zero-click auto switching & task auto-resume for Antigravity IDE.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "Bravee06",
   "author": "Tuan Nguyen Dinh <bravee300@gmail.com>",
   "license": "Apache-2.0",

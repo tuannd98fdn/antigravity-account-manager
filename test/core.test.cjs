@@ -207,6 +207,15 @@ test('agent catalog excludes tab models, disabled models and internal entries', 
     models: { chat: {}, tab: {}, disabled: { disabled: true }, internal: { isInternal: true } } });
   assert.deepEqual(result.map(m => m.id), ['chat']);
 });
+test('agent catalog preserves Gemini 4 Argon preview model', () => {
+  const result = normalizeModels({ agentModelSorts: [{ groups: [{ modelIds: ['gemini-2.5-pro'] }] }],
+    models: {
+      'gemini-2.5-pro': { displayName: 'Gemini 2.5 Pro' },
+      'gemini-4-argon': { displayName: 'Gemini 4 Argon (Medium)', isInternal: true, quotaInfo: { remainingFraction: 0.8 } }
+    }
+  });
+  assert.deepEqual(result.map(m => m.id), ['gemini-2.5-pro', 'gemini-4-argon']);
+});
 test('token refresh preserves refresh token when Google omits a replacement', async () => {
   const original = global.fetch;
   global.fetch = async () => ({ ok: true, json: async () => ({ access_token: 'new', expires_in: 3600 }) });

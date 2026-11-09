@@ -55,7 +55,8 @@ function normalizeModels(response, checkedAt = new Date().toISOString()) {
     ? new Set(response.agentModelSorts.flatMap(sort => (sort.groups || []).flatMap(group => group.modelIds || []))) : null;
   return Object.entries(response.models).filter(([id, model]) => {
     if (!model || typeof model !== 'object') throw new Error('Unrecognized model entry. Integration needs updating.');
-    return !model.disabled && !model.isInternal && (!agentIds || agentIds.has(id));
+    const isArgon = /argon/i.test(id) || /argon/i.test(model.displayName || '') || /argon/i.test(model.label || '');
+    return !model.disabled && (!model.isInternal || isArgon) && (!agentIds || agentIds.has(id) || isArgon);
   }).map(([id, model]) => {
     if (!model || typeof model !== 'object') throw new Error('Unrecognized model entry. Integration needs updating.');
     const hasQuota = model.quotaInfo !== null && typeof model.quotaInfo === 'object' && !Array.isArray(model.quotaInfo);
